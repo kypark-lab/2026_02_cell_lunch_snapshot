@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>같이 시켜요 🍱</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -135,6 +135,39 @@ button{font-family:inherit}
 .scanned-menu-item .menu-price{font-weight:700;font-size:14px;color:var(--accent);white-space:nowrap}
 .scanned-menu-item .menu-add-btn{padding:6px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit}
 .scan-count{font-size:12px;color:var(--mid);margin-top:4px}
+
+/* Responsive */
+@media(min-width:768px){
+  .container{max-width:600px}
+  .room-body{max-width:720px}
+  .home-hero h1{font-size:40px}
+  .stats-grid{gap:14px}
+  .stat-card .value{font-size:26px}
+  .menu-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+  .scanned-menu-grid{grid-template-columns:1fr 1fr}
+  .custom-row{gap:10px}
+}
+@media(min-width:1024px){
+  .container{max-width:640px}
+  .room-body{max-width:800px}
+  .stats-grid{grid-template-columns:1fr 1fr 1fr;gap:16px}
+  .stat-card{padding:18px 16px}
+  .scanned-menu-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:380px){
+  .home-hero h1{font-size:26px}
+  .home-hero .emoji{font-size:48px}
+  .home-card{padding:20px}
+  .room-code{font-size:18px;letter-spacing:3px}
+  .stat-card .value{font-size:18px}
+  .stat-card{padding:10px 8px}
+  .cat-pill{padding:6px 12px;font-size:12px}
+  .menu-btn{padding:10px 6px;font-size:13px}
+  .custom-row{flex-wrap:wrap}
+  .custom-input{min-width:100%}
+  .settle-user-total{font-size:15px}
+  .settle-grand-total .amount{font-size:20px}
+}
 </style>
 </head>
 <body>
@@ -192,7 +225,7 @@ button{font-family:inherit}
 
 <div id="menuScanActions" class="hidden" style="margin-top:12px;display:flex;gap:8px">
   <button class="btn-primary" style="background:var(--purple)" onclick="scanMenuImages()">🔍 메뉴 인식하기</button>
-  <button class="btn-outline" style="width:auto;padding:12px 18px;margin-top:0;border-color:var(--light)" onclick="clearMenuImages()">초기화</button>
+  <button class="btn-outline" style="width:auto;padding:12px 18px;margin-top:0;border-color:var(--light)" onclick="clearMenuImages()">🗑️ 초기화</button>
 </div>
 
 <div id="menuAnalyzingBox" class="analyzing-box hidden" style="background:var(--purple-soft)">
@@ -254,10 +287,10 @@ button{font-family:inherit}
   ondragover="event.preventDefault();this.classList.add('dragging')"
   ondragleave="this.classList.remove('dragging')"
   ondrop="event.preventDefault();this.classList.remove('dragging');handleFileDrop(event)">
-  <input type="file" accept="image/*" capture="environment" onchange="handleFileSelect(event)">
+  <input type="file" accept="image/*" onchange="handleFileSelect(event)">
   <div class="upload-icon">🧾</div>
-  <div class="upload-text">영수증 사진을 올려주세요</div>
-  <div class="upload-hint">클릭 또는 드래그 앤 드롭 · 카메라 촬영도 가능</div>
+  <div class="upload-text">영수증 사진 파일을 선택해주세요</div>
+  <div class="upload-hint">클릭하여 파일 선택 또는 드래그 앤 드롭</div>
 </div>
 
 <div id="analyzingBox" class="analyzing-box hidden"><div class="spinner"></div><p>Claude가 영수증을 분석하고 있습니다...</p></div>
@@ -306,7 +339,7 @@ function decryptKey(e){try{const d=decodeURIComponent(escape(atob(e)));let r="";
 let firebaseReady=false,db=null,unsubscribe=null;
 let currentRoom="",userName="",orders=[],isLocked=false;
 let customQty=1,selectedCategory=null,editingOrderId=null,currentTab="order";
-let receiptData=null,roomApiKey="";
+let receiptData=null,roomApiKey="",isHost=false;
 let menuImages=[]; // {file, dataUrl, base64, mediaType}
 let scannedMenus=[]; // [{name, price, description}]
 
@@ -327,18 +360,57 @@ function esc(s){const d=document.createElement("div");d.textContent=s;return d.i
 
 // Navigation
 function showScreen(n){document.getElementById("screen-home").classList.toggle("hidden",n!=="home");document.getElementById("screen-room").classList.toggle("hidden",n!=="room")}
-function goHome(){if(unsubscribe){unsubscribe();unsubscribe=null}currentRoom="";orders=[];isLocked=false;roomApiKey="";menuImages=[];scannedMenus=[];const u=new URL(location.href);u.searchParams.delete("room");history.replaceState({},"",u);showScreen("home")}
+function goHome(){if(unsubscribe){unsubscribe();unsubscribe=null}currentRoom="";orders=[];isLocked=false;roomApiKey="";isHost=false;menuImages=[];scannedMenus=[];const u=new URL(location.href);u.searchParams.delete("room");history.replaceState({},"",u);showScreen("home")}
 function switchTab(t){currentTab=t;document.getElementById("tabOrder").classList.toggle("active",t==="order");document.getElementById("tabSettle").classList.toggle("active",t==="settle");document.getElementById("orderTab").classList.toggle("hidden",t!=="order");document.getElementById("settleTab").classList.toggle("hidden",t!=="settle");if(t==="settle")renderKeyStatus()}
 
 // Room
-function createRoom(){const n=document.getElementById("nameInput").value.trim();if(!n){notify("이름을 입력해주세요!","warn");return}if(!firebaseReady){notify("Firebase 설정을 먼저 완료해주세요!","error");return}userName=n;currentRoom=genRoomId();const u=new URL(location.href);u.searchParams.set("room",currentRoom);history.replaceState({},"",u);db.ref("rooms/"+currentRoom).set({orders:{},locked:false,createdAt:Date.now(),encryptedApiKey:""});listenToRoom();showScreen("room");document.getElementById("roomCodeDisplay").textContent=currentRoom;notify("방이 생성되었습니다! 🎉")}
+function createRoom(){const n=document.getElementById("nameInput").value.trim();if(!n){notify("이름을 입력해주세요!","warn");return}if(!firebaseReady){notify("Firebase 설정을 먼저 완료해주세요!","error");return}userName=n;currentRoom=genRoomId();isHost=true;const u=new URL(location.href);u.searchParams.set("room",currentRoom);history.replaceState({},"",u);db.ref("rooms/"+currentRoom).set({orders:{},locked:false,createdAt:Date.now(),createdBy:userName,encryptedApiKey:"",scannedMenus:null});listenToRoom();showScreen("room");document.getElementById("roomCodeDisplay").textContent=currentRoom;notify("방이 생성되었습니다! 🎉")}
 function joinRoom(){const n=document.getElementById("nameInput").value.trim();if(!n){notify("이름을 입력해주세요!","warn");return}const c=document.getElementById("joinInput").value.trim().toUpperCase();if(!c){notify("방 코드를 입력해주세요!","warn");return}if(!firebaseReady){notify("Firebase 설정을 먼저 완료해주세요!","error");return}userName=n;currentRoom=c;const u=new URL(location.href);u.searchParams.set("room",currentRoom);history.replaceState({},"",u);db.ref("rooms/"+currentRoom).once("value",snap=>{if(!snap.exists()){notify("존재하지 않는 방입니다","error");currentRoom="";return}listenToRoom();showScreen("room");document.getElementById("roomCodeDisplay").textContent=currentRoom;notify("입장했습니다! 👋")})}
-function listenToRoom(){if(unsubscribe)unsubscribe();const ref=db.ref("rooms/"+currentRoom);const h=ref.on("value",snap=>{const d=snap.val();if(!d)return;orders=d.orders?Object.values(d.orders):[];isLocked=d.locked||false;roomApiKey=d.encryptedApiKey?decryptKey(d.encryptedApiKey):"";renderRoom();if(currentTab==="settle")renderKeyStatus()});unsubscribe=()=>ref.off("value",h)}
+function listenToRoom(){if(unsubscribe)unsubscribe();const ref=db.ref("rooms/"+currentRoom);const h=ref.on("value",snap=>{const d=snap.val();if(!d)return;orders=d.orders?Object.values(d.orders):[];isLocked=d.locked||false;roomApiKey=d.encryptedApiKey?decryptKey(d.encryptedApiKey):"";
+// Determine if current user is host
+isHost=(d.createdBy===userName);
+// Load shared scanned menus
+if(d.scannedMenus){scannedMenus=d.scannedMenus.menus||[];renderScannedMenus(d.scannedMenus.restaurantName||"")}
+renderRoom();if(currentTab==="settle")renderKeyStatus()});unsubscribe=()=>ref.off("value",h)}
 
 // API Key
 function saveApiKeyToRoom(){const k=document.getElementById("apiKeyInput").value.trim();if(!k){notify("API Key를 입력해주세요!","warn");return}if(!k.startsWith("sk-ant-")){notify("올바른 Anthropic API Key 형식이 아닙니다","warn");return}db.ref("rooms/"+currentRoom+"/encryptedApiKey").set(encryptKey(k));roomApiKey=k;document.getElementById("apiKeyInput").value="";renderKeyStatus();notify("API Key가 저장되었습니다! 🔑")}
 function removeApiKeyFromRoom(){if(!confirm("API Key를 삭제하시겠습니까?"))return;db.ref("rooms/"+currentRoom+"/encryptedApiKey").set("");roomApiKey="";renderKeyStatus();notify("API Key가 삭제되었습니다.")}
-function renderKeyStatus(){const bar=document.getElementById("keyStatusBar");if(roomApiKey){const m=roomApiKey.slice(0,10)+"••••••"+roomApiKey.slice(-4);bar.innerHTML=`<div class="key-status connected">✅ API Key 연결됨</div><div style="font-size:12px;color:var(--mid);margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><code style="background:var(--bg);padding:2px 8px;border-radius:6px;font-size:11px">${esc(m)}</code><button onclick="removeApiKeyFromRoom()" style="background:none;border:none;color:var(--red);font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline">삭제</button></div>`;document.querySelector("#apiKeySection label").classList.add("hidden");document.querySelector(".api-key-row").classList.add("hidden");document.querySelector(".api-key-hint").innerHTML="방장이 등록한 API Key로 모든 참여자가 정산 · 메뉴 스캔 기능을 사용할 수 있습니다."}else{bar.innerHTML=`<div class="key-status disconnected">❌ API Key 미등록</div>`;document.querySelector("#apiKeySection label").classList.remove("hidden");document.querySelector(".api-key-row").classList.remove("hidden");document.querySelector(".api-key-hint").innerHTML="방장이 한 번 저장하면 같은 방 사람 모두 정산·메뉴 스캔 기능을 사용할 수 있습니다.<br>키는 암호화되어 Firebase에 저장되며, 이 방에서만 사용됩니다."}}
+function renderKeyStatus(){
+  const section=document.getElementById("apiKeySection");
+  const bar=document.getElementById("keyStatusBar");
+  // Non-host: show simple status only
+  if(!isHost){
+    if(roomApiKey){
+      section.classList.remove("hidden");
+      bar.innerHTML=`<div class="key-status connected">✅ API Key 연결됨</div>`;
+      document.querySelector("#apiKeySection label").classList.add("hidden");
+      document.querySelector(".api-key-row").classList.add("hidden");
+      document.querySelector(".api-key-hint").innerHTML="방장이 등록한 API Key로 정산 · 메뉴 스캔 기능을 사용할 수 있습니다.";
+    } else {
+      section.classList.remove("hidden");
+      bar.innerHTML=`<div class="key-status disconnected">❌ API Key 미등록</div>`;
+      document.querySelector("#apiKeySection label").classList.add("hidden");
+      document.querySelector(".api-key-row").classList.add("hidden");
+      document.querySelector(".api-key-hint").innerHTML="방장이 API Key를 등록하면 정산 · 메뉴 스캔 기능을 사용할 수 있습니다.";
+    }
+    return;
+  }
+  // Host: full control
+  section.classList.remove("hidden");
+  if(roomApiKey){
+    const m=roomApiKey.slice(0,10)+"••••••"+roomApiKey.slice(-4);
+    bar.innerHTML=`<div class="key-status connected">✅ API Key 연결됨</div><div style="font-size:12px;color:var(--mid);margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><code style="background:var(--bg);padding:2px 8px;border-radius:6px;font-size:11px">${esc(m)}</code><button onclick="removeApiKeyFromRoom()" style="background:none;border:none;color:var(--red);font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline">삭제</button></div>`;
+    document.querySelector("#apiKeySection label").classList.add("hidden");
+    document.querySelector(".api-key-row").classList.add("hidden");
+    document.querySelector(".api-key-hint").innerHTML="등록한 API Key로 모든 참여자가 정산 · 메뉴 스캔 기능을 사용할 수 있습니다.";
+  } else {
+    bar.innerHTML=`<div class="key-status disconnected">❌ API Key 미등록</div>`;
+    document.querySelector("#apiKeySection label").classList.remove("hidden");
+    document.querySelector(".api-key-row").classList.remove("hidden");
+    document.querySelector(".api-key-hint").innerHTML="API Key를 저장하면 같은 방 사람 모두 정산·메뉴 스캔 기능을 사용할 수 있습니다.<br>키는 암호화되어 Firebase에 저장되며, 이 방에서만 사용됩니다.";
+  }
+}
 
 // Orders
 function addOrder(m,q){if(isLocked){notify("주문이 마감되었습니다!","warn");return}q=q||1;const id=genOrderId();db.ref("rooms/"+currentRoom+"/orders/"+id).set({id,user:userName,menu:m,qty:q,note:"",timestamp:Date.now()});notify(m+" 추가! ✅")}
@@ -381,6 +453,7 @@ function removeMenuImage(idx){
 
 function clearMenuImages(){
   menuImages=[];scannedMenus=[];
+  if(currentRoom&&db)db.ref("rooms/"+currentRoom+"/scannedMenus").remove();
   renderMenuPreviews();
   document.getElementById("scannedMenuList").classList.add("hidden");
   document.getElementById("menuAnalyzingBox").classList.add("hidden");
@@ -451,6 +524,14 @@ async function scanMenuImages(){
     scannedMenus=parsed.menus||[];
     const restaurantName=parsed.restaurant_name||"";
 
+    // Save to Firebase so all members can see
+    db.ref("rooms/"+currentRoom+"/scannedMenus").set({
+      menus:scannedMenus,
+      restaurantName:restaurantName,
+      scannedBy:userName,
+      scannedAt:Date.now()
+    });
+
     document.getElementById("menuAnalyzingBox").classList.add("hidden");
     document.getElementById("menuScanActions").classList.remove("hidden");
     renderScannedMenus(restaurantName);
@@ -467,6 +548,11 @@ async function scanMenuImages(){
 function renderScannedMenus(restaurantName){
   if(scannedMenus.length===0){document.getElementById("scannedMenuList").classList.add("hidden");return}
   document.getElementById("scannedMenuList").classList.remove("hidden");
+  // Hide upload zone if menus already loaded from Firebase
+  if(menuImages.length===0&&scannedMenus.length>0){
+    document.getElementById("menuUploadZone").classList.add("hidden");
+    document.getElementById("menuScanActions").classList.remove("hidden");
+  }
   document.getElementById("scannedMenuCount").textContent=(restaurantName?restaurantName+" · ":"")+scannedMenus.length+"개 메뉴";
 
   document.getElementById("scannedMenuGrid").innerHTML=scannedMenus.map((m,i)=>{
@@ -606,3 +692,4 @@ function renderRoom(){
 </script>
 </body>
 </html>
+
